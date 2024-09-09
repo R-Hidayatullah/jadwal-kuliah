@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jadwal Kuliah</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="container my-5">
+        <h1 class="text-center mb-4">Jadwal Kuliah</h1>
+        <!-- Container for tables -->
+        <div id="tablesContainer"></div>
+    </div>
+
+    <script>
+        // Function to read and parse jadwal_kuliah.txt
+        async function loadScheduleData() {
+            const response = await fetch('jadwal_kuliah.txt');
+            const text = await response.text();
+
+            const rows = text.trim().split('\n'); // Split into rows
+            const tableContainer = document.querySelector('#tablesContainer');
+            const labels = [];
+            const studentCounts = [];
+
+            let currentTable = null;
+            let skipNextRow = false; // Variable to track whether to skip the next row
+
+            rows.forEach((row, index) => {
+                // Check for day headers
+                if (row.match(/(Senin|Selasa|Rabu|Kamis|Jumat|Sabtu|Minggu)/)) {
+                    // Add the previous table if it exists
+                    if (currentTable) {
+                        tableContainer.appendChild(currentTable);
+                    }
+
+                    // Add a title for the day
+                    const dayTitle = document.createElement('h2');
+                    dayTitle.classList.add('my-4');
+                    dayTitle.textContent = row;
+                    tableContainer.appendChild(dayTitle);
+
+                    // Create a new table
+                    currentTable = document.createElement('table');
+                    currentTable.classList.add('table', 'table-bordered', 'table-hover', 'mb-4');
+                    currentTable.innerHTML = `
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Jam</th>
+                        <th>Ruang</th>
+                        <th>Kode MK</th>
+                        <th>Matakuliah</th>
+                        <th>Jenis</th>
+                        <th>Sem</th>
+                        <th>Kelas</th>
+                        <th>SKS</th>
+                        <th>Wajib</th>
+                        <th>Program</th>
+                        <th>Dosen</th>
+                        <th>Jml Mhs</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            `;
+                    skipNextRow = true; // Skip the next row
+                } else if (skipNextRow) {
+                    // Skip processing the next row after a day header
+                    skipNextRow = false;
+                } else {
+                    // Split columns by one or more tabs or spaces
+                    const columns = row.split(/\s{2,}|\t/);
+
+                    // Ensure there are at least 13 columns, filling missing columns with empty strings
+                    while (columns.length < 13) {
+                        columns.splice(2, 0, ''); // Insert an empty string after 'Jam' column
+                    }
+
+                    if (columns.length >= 13) { // Ensure it's a valid row with at least 13 columns
+                        // Add a default value for 'Ruang' if it's missing
+                        columns[2] = columns[2] || 'N/A'; // Default value for 'Ruang'
+
+                        const jmlMhs = columns[12].split('/');
+                        const currentCount = parseInt(jmlMhs[0]) || 0; // Default to 0 if NaN
+                        const maxCapacity = parseInt(jmlMhs[1]) || 0; // Default to 0 if NaN
+
+                        let rowColor = '';
+
+                        // Determine row color based on capacity
+                        if (maxCapacity > 0) {
+                            if (currentCount >= maxCapacity) {
+                                rowColor = 'table-danger'; // Red for full
+                            } else if (currentCount >= 0.8 * maxCapacity) {
+                                rowColor = 'table-warning'; // Yellow for almost full
+                            } else {
+                                rowColor = 'table-success'; // Green for not full
+                            }
+                        } else {
+                            rowColor = 'table-secondary'; // Gray for missing capacity data
+                        }
+
+                        const rowHTML = `
+                    <tr class="${rowColor}">
+                        <td>${columns[0]}</td>
+                        <td>${columns[1]}</td>
+                        <td>${columns[2]}</td>
+                        <td>${columns[3]}</td>
+                        <td>${columns[4]}</td>
+                        <td>${columns[5]}</td>
+                        <td>${columns[6]}</td>
+                        <td>${columns[7]}</td>
+                        <td>${columns[8]}</td>
+                        <td>${columns[9]}</td>
+                        <td>${columns[10]}</td>
+                        <td>${columns[11]}</td>
+                        <td>${columns[12]}</td>
+                    </tr>
+                `;
+                        currentTable.querySelector('tbody').innerHTML += rowHTML;
+
+                        // Collect data for the chart
+                        labels.push(columns[4] || ''); // Matakuliah (subject)
+                        studentCounts.push(currentCount); // Jml Mhs
+                    }
+                }
+            });
+
+            // Add the last table if it exists
+            if (currentTable) {
+                tableContainer.appendChild(currentTable);
+            }
+
+            // Generate chart
+            generateChart(labels, studentCounts);
+        }
+
+
+        // Load data when the page is ready
+        document.addEventListener('DOMContentLoaded', loadScheduleData);
+
+        // Function to generate the chart
+        function generateChart(labels, data) {
+            const ctx = document.createElement('canvas');
+            document.querySelector('.container').appendChild(ctx);
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Jumlah Mahasiswa',
+                        data: data,
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
